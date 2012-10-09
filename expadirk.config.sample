@@ -1,0 +1,33 @@
+# set this to force all emails to go this email address rather than the one specified in the pdf
+testemailaddress = jason@mytestemailaddress.com
+
+# send a copy of all emails to this email address
+#bcc = some@otheraddress.com
+
+# location of log file
+logfile = /var/lib/u_drive/PDF/log.txt
+
+# debug level 1-7, 7 is most verbose
+debug = 2
+
+# set sendmail to 1 to actually allow sending of emails
+sendmail = 1
+
+# directory to store PDFs as they are parsed, split and emailed off
+PDFDirectoryName = /var/lib/u_drive/PDF/
+
+# default from address for emails
+defaultfromaddress = some@otheraddress.com
+
+# The cups name of the printer to send jobs to when 
+#  the email body contains the custom tag <print>
+printername = hp_hp_LaserJet_4250_admin
+
+# which tray should the print come out of from the printer?
+printermedia = Tray3
+
+# send a copy of the email to the from address (good for keeping a local copy of the email that was sent)
+bccmyself = 1
+
+# address to bcc emails to
+bccaddress = jason@mytestemailaddress.com

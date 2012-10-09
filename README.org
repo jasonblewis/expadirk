@@ -1,0 +1,57 @@
+* Expadirk - automaticly split and email PDFs
+
+Expadirk takes a PDF and emails parts of it to various recipients
+listed on special pages within the PDF. It loosly follows the syntax
+of pdfMachine's BroadGun program. It is ideal for producing reports as
+one big PDF and then emailing parts of it out.
+
+Expadirk attempts to emulate the pdfMachine BroadGun program syntax. It also
+adds a few custom features to work around brain dead programs that use
+BroadGun but don't offer a way to utilise all of BroadGun's features.
+
+It takes as input a PDF file and parses it to determine what to do
+with it. Ultimately splitting up the PDF into smaller files and
+emailing them off to the recipients, as defined by the command pages
+between each set of PDF pages.
+
+Use this program in conjunction with cups-pdf and custom post
+processing to enable sending of PDF email reports from programs that
+support BroadGun
+http://www.debianadmin.com/howto-install-and-customize-cups-pdf-in-debian.html
+
+* Special Features
+** From address
+  <from></from> Put these tages around an email address inside the
+  emailBody section in a PDF and expadirk will use that email address
+  as the from address
+** Print
+   <print> inside the emailBody will cause expadirk to also print a
+   copy of the PDF
+
+* Know Issues
+
+This is a bit rough and ready but It has served me well for the last
+few years. Patches welcome.
+
+Perl CAM::PDF doesn't do a great job of extracting the
+text from a PDF and often puts extraneous spaces between words. See
+http://stackoverflow.com/questions/1136990/how-can-i-extract-text-from-a-pdf-file-in-perl
+for possible solutions to this. Particularly
+http://www.unixuser.org/~euske/python/pdfminer/index.html
+
+
+* Getting Started
+
+Copy the expadirk.config.sample file to expadirk.config and edit
+values to suit your location.
+
+to test, call with ./expadirk testpdf.pdf
+
+you should receive two PDFs in your email. 
+
+* Contact
+Contact me for further info or see the project on github.
+
+Jason Lewis <jason@dickson.st>
+
+

@@ -1,0 +1,292 @@
+#!/usr/bin/perl -w
+# ;;; Local Variables: ***
+# ;;; compile-command: "expadirk ./testpdf.pdf" ***
+# ;;; End: ***
+
+# Expadirk v0.1 Copyright 2012 Jason Lewis
+
+# This file is part of Expadirk.
+
+# Expadirk is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# Expadirk is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with Expadirk.  If not, see <http://www.gnu.org/licenses/>.
+
+# Expadirk-
+# Program to email PDFs.
+# Scans through a provided PDF and searches for paramater pages. It then uses those paramaters
+# to compose an email to the recipient and email the relevant pages
+
+# to test this program call from command line:  ./expadirk.pl testpdf.pdf
+
+
+use Config::Auto;
+my $config;
+$config = Config::Auto::parse();
+my $logfile = $config->{logfile};
+
+# redirect stdout and stderr to our log file because cups-pdf doesn't seem to save output
+open my $oldout, ">&STDOUT"     or die "Can't dup STDOUT: $!";
+open my $olderr, ">&", \*STDERR or die "Can't dup STDERR: $!";
+
+open STDOUT, '>>', $logfile or die "Can't redirect STDOUT: $!";
+open STDERR, ">&STDOUT"     or die "Can't dup STDOUT: $!";
+
+
+select STDERR; $| = 1;      # make unbuffered
+select STDOUT; $| = 1;      # make unbuffered
+print STDOUT "stdout 1\n";  # this works for
+print STDERR "stderr 1\n";  # subprocesses too
+
+use warnings;
+use strict;
+use CAM::PDF;
+use Data::Dumper;
+use PDF::Reuse;
+use MIME::Lite;
+use POSIX;
+use Log::Dispatch::File;
+use Net::CUPS::Destination;
+
+
+# level verbose explanation
+#     0 emerg system is unusable
+#     1 alert action must be taken immediately
+#     2 crit the system is in a critical condition
+#     3 err there is an error condition
+#     4 warning there is a warning condition
+#     5 notice a normal but significant condition
+#     6 info a purely informational message
+#     7 debug messages generated to debug the application
+
+
+my $debug = $config->{debug};
+my $sendemail = $config->{sendmail};;
+# setting $testemailaddress will redirect all emails to the below address
+#my $testemailaddress = 'jason@organictrader.com.au';
+my $testemailaddress = $config->{testemailaddress};
+my $bcc = $config->{bcc};
+my $bccaddress = $config->{bccaddress};
+my $dispatcher = Log::Dispatch->new;
+$dispatcher->add( Log::Dispatch::File->new( 
+		      name => 'somename',
+		      min_level => 'info',
+		      filename => $logfile,
+                      mode      => 'append') );
+# wrapper arround dispatcher to log to a file
+sub logit {
+    (my $level, my $message) = @_;
+    $dispatcher->log(level=> $level, message => $$.' '.strftime('%Y-%m-%d %H:%M:%S', localtime())." ".$message."\n");
+};
+
+logit('info','expadirk started-------------------------------------------------------------------------------------------------');
+my $localarg;
+my $pdfname;
+
+if (@ARGV) {
+    foreach my $argnum (0 .. $#ARGV) { 
+	print "Argument $argnum: $ARGV[$argnum]\n";
+    $pdfname = $ARGV[0];
+    }
+#    logit('info',"Command Line argumets: ".$0."|$localarg");
+    
+} else {
+    logit('info',"no name for pdf file");
+    logit('info',"ERROR: no name for pdf file, bye.");
+    exit;
+}
+# check to see if file exists and is readable
+if ( -r $pdfname ) {
+    logit('debug', "File $pdfname exists and is readable")  if ($debug>=1);
+} else {
+    logit('err', "File $pdfname does not exist or is not readable")  if ($debug>=1);
+}     
+
+
+my $pdf = CAM::PDF->new($pdfname) || do {
+    logit('critical',"$CAM::PDF::errstr");
+    die "$CAM::PDF::errstr";
+};
+
+# debugging variables
+# valid debug values 1-3
+
+my $sectionFP = 1;
+my $sectionLP;
+my $content;
+my $PDFDirectoryName = $config->{PDFDirectoryName};
+my $defaultfromaddress = $config->{defaultfromaddress};
+my $printername = $config->{printername};
+my $printermedia = $config->{printermedial};
+my $bccmyself = $config->{bccmyself};
+
+my @section;
+
+
+# step through each page and see if we have a parameter page
+
+# First, work out where each section is. Put list of sections into some kind of array
+foreach my $p (1 .. $pdf->numPages())   {
+  $content = $pdf->getPageText($p);
+  logit('debug',"PAGE: $p $content") if ($debug >=2);
+  my $found = 0;
+  if ($content =~ m/#_ (\w+) (.+?)_#/) {  # see if we have a parameter page, if we do then search it for parameters
+    my %variables;
+    while ($content =~ s/#_ (\w+) (.+?) _#(.*)/$3/s) {
+      $variables{$1} = $2;
+      print "Page: $p :$1 -> ###$2###" if ($debug >=2 );
+      $found = 1;
+    }
+    $sectionLP = $p;
+    logit('debug',"range: $sectionFP - $sectionLP") if ($debug);
+    $variables{'SectionFP'} = $sectionFP;
+    $variables{'SectionLP'} = $sectionLP;
+    push(@section, {%variables});
+    $sectionFP = $p+1;
+  }
+}
+
+
+# now make the pdf's and email them:
+prDocDir ( $PDFDirectoryName );
+my $var;
+foreach $var (@section) { 
+    logit('debug',Dumper($var)) if ($debug >=3);
+    logit('debug',"startpage = ".$var->{'SectionFP'}." endpage = ".$var->{'SectionLP'}) if ($debug >=1); 
+
+    my $attachmentname = $var->{'emailAttachmentName'}; 
+    my $attachmentfilename = $$.$attachmentname; # append process id to ensure uniqueness of file names
+    # check to see if it ends in pdf and if not, add PDF to it
+    if ($attachmentfilename !~ /\.pdf\z/i) {
+	$attachmentfilename = $attachmentfilename . ".PDF" }
+    my $sendmail = "/usr/sbin/sendmail -t"; 
+    my $reply_to = 'From: ar@organictrader.com.au';
+    my $subject = $var->{'emailSubject'};
+    my $mycontent = $var->{'emailBody'};
+    my $to = $var->{'email'};
+    my $from = 'ar@organictrader.com.au';
+    my $printfile = 0; # false by default
+    # test if body contains a from email address and use that if its there
+    if ( $mycontent =~ s/<.?f.?r.?o.?m.?>(.*)<.?\/.?f.?r.?o.?m.?>//s ) {
+	print "\nin if statement debug=$debug\n";
+	logit('debug','Found from email address.') if ($debug>=2);
+	$from = "$1";
+	$from =~ s/\s+//g;
+	$reply_to = $from;
+	$bcc = $from if ($bccmyself); # bcc myself to from address
+	logit('debug',"from: $from") if ($debug>=2);
+	logit('debug',"bcc: $bcc") if ($debug>=2);
+    } else {
+	print "\nin else statement debug=$debug\n";
+	logit('debug','Failed to find a from email address.') if ($debug>=2);
+    }
+    
+    # test for <print> directive and print if found
+    if ( $mycontent =~ s/<.?p.?r.?i.?n.?t.?>\n?//s ) {
+	$printfile=1; # found print command, we should print this file
+    }
+    
+    prFile($attachmentfilename);
+    prDoc( { file  => $pdfname,  # name of long pdf to get pages from
+	     first => $var->{'SectionFP'},
+	     last  => $var->{'SectionLP'}-1});
+    prEnd(); #file has now been save to disk
+       
+    #log the results ";
+    logit('debug', "sendmail -> $sendmail") if ($debug>=2);
+    logit('debug', "reply_to -> $reply_to") if ($debug>=2);
+    logit('debug', "subject -> $subject") if ($debug>=2);
+    logit('debug', "content -> $mycontent") if ($debug>=3);
+    logit('debug', "to -> $to")  if ($debug>=2);
+    logit('debug', "attachmentname -> $attachmentname")  if ($debug>=2);
+    logit('debug', "attachmentfilename -> $attachmentfilename")  if ($debug>=2);
+    logit('debug', "Path: ".$PDFDirectoryName."$attachmentfilename") if ($debug>=2);
+    
+    my $filepath = $PDFDirectoryName.$attachmentfilename;
+    if ( -r $filepath ) {
+	logit('debug', "File $filepath exists and is readable")  if ($debug>=2);
+    } else {
+	logit('err', "File $filepath does not exist or is not readable")  if ($debug>=2);
+    }     
+    
+    
+    my $msg = MIME::Lite->new(
+	From    => "$from",
+	Subject => "$subject",
+	Type    => 'multipart/mixed',
+	);
+    
+    if ($testemailaddress) {
+	logit('info',"Line: " . __LINE__. " Sending email to \$testemailaddress: $testemailaddress instead of $to");
+	$msg->add(To => "$testemailaddress");
+    } else {
+	logit('debug', __LINE__ . "Sending email to $to");
+	$msg->add(To => "$to");
+    }	
+
+    if ($bccaddress) {
+        logit('info',"overriding bcc address $bcc with config supplied bcc adress $bccaddress");
+        $bcc = $bccaddress;
+    }
+
+    if ($bcc) {
+	logit('info', "adding Bcc: $bcc to email");
+	$msg->add(Bcc => "$bcc");
+    } 
+    
+    
+    $msg->attach(
+	Type     => 'TEXT',
+	Data     => $mycontent,
+	);
+    
+    $msg->attach(
+	Type     => 'application/pdf',
+	Path     => $filepath,
+	Filename => "$attachmentfilename",
+	);
+    
+    logit('info', "sending $attachmentname to: $to");
+    if ($sendemail) {
+	logit('info', "\$sendemail set: really sending $attachmentfilename as $attachmentfilename to: $to");
+	$msg->send || logit('critical',"Critical Error: Was unable to send email:\nTo: $to\nSubject: $subject\nAttachment: $attachmentfilename");
+	#if ($msg->last_send_successful()) {
+	#}
+	
+    } else {
+	logit('debug', "\$sendemail not set: not sending email") if ($debug>=1);
+    }
+    
+
+    # print the file if $printfile is set
+    if ($printfile) {
+	logit('debug',"printing the file: $filepath");
+	my $cups = Net::CUPS->new();
+#	my $printer = $cups->getDestination( "HP_LaserJet_4050_Series" );
+	my $printer = $cups->getDestination( "hp_hp_LaserJet_4250_admin" );
+	my $name = $printer->getName();
+	my @options = $printer->getOptions();
+	$printer->addOption('Media','Tray3');
+	my $jobid = $printer->printFile( $filepath, $attachmentfilename );
+    }
+
+    #no need for the temp file any more - delete it
+    logit('debug', "deleting $filepath");
+    if (unlink($filepath) != 1) {
+	logit('warn', "unable to delete $filepath or $filepath not found");
+    }
+} # end for each
+
+# reset strout and stderr before exiting
+open STDOUT, ">&", $oldout or die "Can't dup \$oldout: $!";
+open STDERR, ">&", $olderr or die "Can't dup OLDERR: $!";
+
+logit('info','expadirk ended');

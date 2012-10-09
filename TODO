@@ -1,0 +1,10 @@
+* Expadirk TODO
+
+ - have a way, from command line, to redirect all emailing to a local email address for testing purposes.
+ - ensure expadirk handles multiple email in the to:, cc:, and bcc:
+   fields.
+ - add documentation regarding configuring with cups-pdf
+ - Warn the user if they try and launch expadirk and no config file
+   can be found
+
+
