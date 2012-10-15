@@ -99,7 +99,6 @@ if (@ARGV) {
 #    logit('info',"Command Line argumets: ".$0."|$localarg");
     
 } else {
-    logit('info',"no name for pdf file");
     logit('info',"ERROR: no name for pdf file, bye.");
     exit;
 }
