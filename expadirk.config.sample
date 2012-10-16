@@ -26,6 +26,9 @@ printername = hp_hp_LaserJet_4250_admin
 # which tray should the print come out of from the printer?
 printermedia = Tray3
 
+# enable printing? unset if you want to prevent expadirk from printing.
+printenable = 1
+
 # send a copy of the email to the from address (good for keeping a local copy of the email that was sent)
 bccmyself = 1
 

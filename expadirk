@@ -3,7 +3,7 @@
 # ;;; compile-command: "expadirk ./testpdf.pdf" ***
 # ;;; End: ***
 
-# Expadirk v0.1 Copyright 2012 Jason Lewis
+# Expadirk v0.2 Copyright 2012 Jason Lewis
 
 # This file is part of Expadirk.
 
@@ -26,7 +26,6 @@
 # to compose an email to the recipient and email the relevant pages
 
 # to test this program call from command line:  ./expadirk.pl testpdf.pdf
-
 
 use Config::Auto;
 my $config;
@@ -55,7 +54,8 @@ use MIME::Lite;
 use POSIX;
 use Log::Dispatch::File;
 use Net::CUPS::Destination;
-
+use IPC::Open2;
+use File::Which;
 
 # level verbose explanation
 #     0 emerg system is unusable
@@ -70,8 +70,6 @@ use Net::CUPS::Destination;
 
 my $debug = $config->{debug};
 my $sendemail = $config->{sendmail};;
-# setting $testemailaddress will redirect all emails to the below address
-#my $testemailaddress = 'jason@organictrader.com.au';
 my $testemailaddress = $config->{testemailaddress};
 my $bcc = $config->{bcc};
 my $bccaddress = $config->{bccaddress};
@@ -99,7 +97,6 @@ if (@ARGV) {
 #    logit('info',"Command Line argumets: ".$0."|$localarg");
     
 } else {
-    logit('info',"no name for pdf file");
     logit('info',"ERROR: no name for pdf file, bye.");
     exit;
 }
@@ -122,11 +119,23 @@ my $pdf = CAM::PDF->new($pdfname) || do {
 my $sectionFP = 1;
 my $sectionLP;
 my $content;
+my $pdf2txt = 'pdf2txt.py';
 my $PDFDirectoryName = $config->{PDFDirectoryName};
 my $defaultfromaddress = $config->{defaultfromaddress};
 my $printername = $config->{printername};
-my $printermedia = $config->{printermedial};
+my $printermedia = $config->{printermedia};
+my $printenable = $config->{printenable};
 my $bccmyself = $config->{bccmyself};
+my $usepdfminer = $config->{usepdfminer};
+
+# if we are using pdfminer, test if its available
+if ($usepdfminer) {
+    my $pdf2txt_exe = which($pdf2txt);
+        unless ( -X $pdf2txt_exe ) {
+            die "$pdf2txt not found or not executeable";
+        }
+}
+
 
 my @section;
 
@@ -134,23 +143,50 @@ my @section;
 # step through each page and see if we have a parameter page
 
 # First, work out where each section is. Put list of sections into some kind of array
+
+my $chldout;
+my $chldin;
+my $pid = open2($chldout,$chldin,'pdf2txt.py', '-t', 'text', '-p', '2',$pdfname);
+
+
 foreach my $p (1 .. $pdf->numPages())   {
-  $content = $pdf->getPageText($p);
+    print("before system call page: $p\n");
+    if ($usepdfminer) {
+        logit('info','using pdf2txt.py');
+        $pid = open2($chldout,$chldin,'pdf2txt.py', '-t', 'text', '-p', $p,$pdfname);
+        $content = do { 
+            local $/;
+            <$chldout>;
+        }; 
+    } else {
+        logit('info','using CAM::PDF');
+        $content = $pdf->getPageText($p);
+    }
+        
+
+    my $len=length($content);
+    print("aftersystem call print: content pdfname: $pdfname len:$len\n");
+
   logit('debug',"PAGE: $p $content") if ($debug >=2);
   my $found = 0;
-  if ($content =~ m/#_ (\w+) (.+?)_#/) {  # see if we have a parameter page, if we do then search it for parameters
+  if ($content =~ m/#_ (\w+) (.+?)_#/) {  # see if we have a parameter
+                                # page, if we do then search it for
+                                # parameters
+      print "found a paramater page\n";
+      logit('debug',"found a paramater page");
+
     my %variables;
     while ($content =~ s/#_ (\w+) (.+?) _#(.*)/$3/s) {
-      $variables{$1} = $2;
-      print "Page: $p :$1 -> ###$2###" if ($debug >=2 );
-      $found = 1;
+        $variables{$1} = $2;
+        print "Page: $p :$1 -> ###$2###" if ($debug >=2 );
+        $found = 1;
     }
-    $sectionLP = $p;
-    logit('debug',"range: $sectionFP - $sectionLP") if ($debug);
-    $variables{'SectionFP'} = $sectionFP;
-    $variables{'SectionLP'} = $sectionLP;
-    push(@section, {%variables});
-    $sectionFP = $p+1;
+      $sectionLP = $p;
+      logit('debug',"range: $sectionFP - $sectionLP") if ($debug);
+      $variables{'SectionFP'} = $sectionFP;
+      $variables{'SectionLP'} = $sectionLP;
+      push(@section, {%variables});
+      $sectionFP = $p+1;
   }
 }
 
@@ -161,22 +197,21 @@ my $var;
 foreach $var (@section) { 
     logit('debug',Dumper($var)) if ($debug >=3);
     logit('debug',"startpage = ".$var->{'SectionFP'}." endpage = ".$var->{'SectionLP'}) if ($debug >=1); 
-
+    
     my $attachmentname = $var->{'emailAttachmentName'}; 
     my $attachmentfilename = $$.$attachmentname; # append process id to ensure uniqueness of file names
     # check to see if it ends in pdf and if not, add PDF to it
     if ($attachmentfilename !~ /\.pdf\z/i) {
 	$attachmentfilename = $attachmentfilename . ".PDF" }
     my $sendmail = "/usr/sbin/sendmail -t"; 
-    my $reply_to = 'From: ar@organictrader.com.au';
+    my $reply_to = 'From: ar@defaultemailaddress.com.au';
     my $subject = $var->{'emailSubject'};
     my $mycontent = $var->{'emailBody'};
     my $to = $var->{'email'};
-    my $from = 'ar@organictrader.com.au';
+    my $from = 'ar@defaultemailaddress';
     my $printfile = 0; # false by default
     # test if body contains a from email address and use that if its there
     if ( $mycontent =~ s/<.?f.?r.?o.?m.?>(.*)<.?\/.?f.?r.?o.?m.?>//s ) {
-	print "\nin if statement debug=$debug\n";
 	logit('debug','Found from email address.') if ($debug>=2);
 	$from = "$1";
 	$from =~ s/\s+//g;
@@ -227,6 +262,7 @@ foreach $var (@section) {
     if ($testemailaddress) {
 	logit('info',"Line: " . __LINE__. " Sending email to \$testemailaddress: $testemailaddress instead of $to");
 	$msg->add(To => "$testemailaddress");
+        $to = $testemailaddress;
     } else {
 	logit('debug', __LINE__ . "Sending email to $to");
 	$msg->add(To => "$to");
@@ -270,12 +306,13 @@ foreach $var (@section) {
     if ($printfile) {
 	logit('debug',"printing the file: $filepath");
 	my $cups = Net::CUPS->new();
-#	my $printer = $cups->getDestination( "HP_LaserJet_4050_Series" );
-	my $printer = $cups->getDestination( "hp_hp_LaserJet_4250_admin" );
+	my $printer = $cups->getDestination( $printername );
 	my $name = $printer->getName();
 	my @options = $printer->getOptions();
-	$printer->addOption('Media','Tray3');
-	my $jobid = $printer->printFile( $filepath, $attachmentfilename );
+	$printer->addOption('Media',$printermedia);
+	if ($printenable) {
+            my $jobid = $printer->printFile( $filepath, $attachmentfilename );
+        }
     }
 
     #no need for the temp file any more - delete it
