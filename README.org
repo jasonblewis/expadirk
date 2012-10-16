@@ -54,6 +54,17 @@ To test, call with ./expadirk testpdf.pdf
 
 you should receive two PDFs in your email. 
 
+
+* cups-pdf
+Install cups-pdf
+edit /etc/cups-pdf.conf
+
+set:
+PostProcessing /path/to/expadirk
+
+Set Out to something that matches PDFDirectoryName in expadirk.config
+Out /var/lib/u_drive/PDF
+
 * Contact
 Contact me for further info or see the project on github.
 
