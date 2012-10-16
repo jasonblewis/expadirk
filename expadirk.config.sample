@@ -31,3 +31,7 @@ bccmyself = 1
 
 # address to bcc emails to
 bccaddress = jason@mytestemailaddress.com
+
+# use python pdfminer tool to extract text from PDF
+#    pdfminer is significantly better at exctracting clean text than CAM::PDF
+usepdfminer = 1
