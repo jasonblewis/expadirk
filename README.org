@@ -1,5 +1,4 @@
 * Expadirk - automaticly split and email PDFs
-
 Expadirk takes a PDF and emails parts of it to various recipients
 listed on special pages within the PDF. It loosly follows the syntax
 of pdfMachine's BroadGun program. It is ideal for producing reports as
@@ -19,6 +18,12 @@ processing to enable sending of PDF email reports from programs that
 support BroadGun
 http://www.debianadmin.com/howto-install-and-customize-cups-pdf-in-debian.html
 
+* STDOUT and STDERR
+  cups-pdf does not seem to trap output from post processors and
+  provide a way to see that output. I therefore have redirected all
+  output from expadirk to the log file. If you are having any issues,
+  please check the log file for errors and warnings.
+
 * Special Features
 ** From address
   <from></from> Put these tages around an email address inside the
@@ -29,23 +34,23 @@ http://www.debianadmin.com/howto-install-and-customize-cups-pdf-in-debian.html
    copy of the PDF
 
 * Know Issues
-
 This is a bit rough and ready but It has served me well for the last
 few years. Patches welcome.
 
 Perl CAM::PDF doesn't do a great job of extracting the
 text from a PDF and often puts extraneous spaces between words. See
 http://stackoverflow.com/questions/1136990/how-can-i-extract-text-from-a-pdf-file-in-perl
-for possible solutions to this. Particularly
-http://www.unixuser.org/~euske/python/pdfminer/index.html
-
 
 * Getting Started
+Install pdfminer from
+http://www.unixuser.org/~euske/python/pdfminer/index.html
+
+Pdfminer is optional but expadirk will produce better results if its available.
 
 Copy the expadirk.config.sample file to expadirk.config and edit
 values to suit your location.
 
-to test, call with ./expadirk testpdf.pdf
+To test, call with ./expadirk testpdf.pdf
 
 you should receive two PDFs in your email. 
 
