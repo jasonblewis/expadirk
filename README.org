@@ -37,6 +37,8 @@ http://www.debianadmin.com/howto-install-and-customize-cups-pdf-in-debian.html
    - email         :: recipient's email address
    - emailCC       :: cc the email to this person
    - emailAttachmentName :: file name of the attachment PDF in the email
+   - SplitPDF :: ignored - PDFs are split about each parameter page.
+                 Parameter pages are removed prior to PDFs being emailed.
    
 * Special Features
 ** From address
