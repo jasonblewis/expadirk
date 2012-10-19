@@ -243,7 +243,7 @@ foreach $var (@section) {
     logit('debug', "attachmentfilename -> $attachmentfilename") ;
     logit('debug', "Path: ".$PDFDirectoryName."$attachmentfilename");
 
-    $filepath = $PDFDirectoryName.$attachmentfilename;
+    my $filepath = $PDFDirectoryName.$attachmentfilename;
     if ( -r $filepath ) {
 	logit('debug', "File $filepath exists and is readable") ;
     } else {
