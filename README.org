@@ -24,6 +24,20 @@ http://www.debianadmin.com/howto-install-and-customize-cups-pdf-in-debian.html
   output from expadirk to the log file. If you are having any issues,
   please check the log file for errors and warnings.
 
+* Parameter Parsing
+  Expadir will process the PDFs passed to it, looking for pages that
+  contain paramaters. A paramater page is a page that contains at
+  least one line of the format #_ .* _# where .* means any characters.
+** Parameters
+   Parameters consist of #_ command [arguments] _#
+   where command is one of the following
+
+   - emailSubject  :: subject of email
+   - emailBody     :: body text of email
+   - email         :: recipient's email address
+   - emailCC       :: cc the email to this person
+   - emailAttachmentName :: file name of the attachment PDF in the email
+   
 * Special Features
 ** From address
   <from></from> Put these tages around an email address inside the

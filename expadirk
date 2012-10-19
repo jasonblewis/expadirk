@@ -162,7 +162,7 @@ foreach my $p (1 .. $pdf->numPages())   {
         logit('info','using CAM::PDF');
         $content = $pdf->getPageText($p);
     }
-        
+
 
     my $len=length($content);
     print("aftersystem call print: content pdfname: $pdfname len:$len\n");
@@ -172,7 +172,6 @@ foreach my $p (1 .. $pdf->numPages())   {
   if ($content =~ m/#_ (\w+) (.+?)_#/) {  # see if we have a parameter
                                 # page, if we do then search it for
                                 # parameters
-      print "found a paramater page\n";
       logit('debug',"found a paramater page");
 
     my %variables;
@@ -196,8 +195,8 @@ prDocDir ( $PDFDirectoryName );
 my $var;
 foreach $var (@section) { 
     logit('debug',Dumper($var)) if ($debug >=3);
-    logit('debug',"startpage = ".$var->{'SectionFP'}." endpage = ".$var->{'SectionLP'}) if ($debug >=1); 
-    
+    logit('debug',"startpage = ".$var->{'SectionFP'}." endpage = ".$var->{'SectionLP'}) if ($debug >=1);
+
     my $attachmentname = $var->{'emailAttachmentName'}; 
     my $attachmentfilename = $$.$attachmentname; # append process id to ensure uniqueness of file names
     # check to see if it ends in pdf and if not, add PDF to it
