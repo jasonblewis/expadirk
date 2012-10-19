@@ -7,7 +7,7 @@ testemailaddress = jason@mytestemailaddress.com
 # location of log file
 logfile = /var/lib/u_drive/PDF/log.txt
 
-# debug level 1-7, 7 is most verbose
+# debug level 0-7, 0 is most verbose
 debug = 2
 
 # set sendmail to 1 to actually allow sending of emails

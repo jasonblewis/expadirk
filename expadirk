@@ -76,7 +76,7 @@ my $bccaddress = $config->{bccaddress};
 my $dispatcher = Log::Dispatch->new;
 $dispatcher->add( Log::Dispatch::File->new( 
 		      name => 'somename',
-		      min_level => 'info',
+		      min_level => $debug,
 		      filename => $logfile,
                       mode      => 'append') );
 # wrapper arround dispatcher to log to a file
@@ -102,9 +102,9 @@ if (@ARGV) {
 }
 # check to see if file exists and is readable
 if ( -r $pdfname ) {
-    logit('debug', "File $pdfname exists and is readable")  if ($debug>=1);
+    logit('debug', "File $pdfname exists and is readable");
 } else {
-    logit('err', "File $pdfname does not exist or is not readable")  if ($debug>=1);
+    logit('error', "File $pdfname does not exist or is not readable");
 }     
 
 
@@ -113,13 +113,12 @@ my $pdf = CAM::PDF->new($pdfname) || do {
     die "$CAM::PDF::errstr";
 };
 
-# debugging variables
-# valid debug values 1-3
 
 my $sectionFP = 1;
 my $sectionLP;
 my $content;
 my $pdf2txt = 'pdf2txt.py';
+my $pdf2txt_exe;
 my $PDFDirectoryName = $config->{PDFDirectoryName};
 my $defaultfromaddress = $config->{defaultfromaddress};
 my $printername = $config->{printername};
@@ -130,7 +129,7 @@ my $usepdfminer = $config->{usepdfminer};
 
 # if we are using pdfminer, test if its available
 if ($usepdfminer) {
-    my $pdf2txt_exe = which($pdf2txt);
+    $pdf2txt_exe = which($pdf2txt);
         unless ( -X $pdf2txt_exe ) {
             die "$pdf2txt not found or not executeable";
         }
@@ -146,14 +145,14 @@ my @section;
 
 my $chldout;
 my $chldin;
-my $pid = open2($chldout,$chldin,'pdf2txt.py', '-t', 'text', '-p', '2',$pdfname);
+my $pid; # = open2($chldout,$chldin,$pdf2txt_exe, '-t', 'text', '-p', '2',$pdfname);
 
 
 foreach my $p (1 .. $pdf->numPages())   {
-    print("before system call page: $p\n");
+    logit('debug',"before system call page: $p\n");
     if ($usepdfminer) {
-        logit('info','using pdf2txt.py');
-        $pid = open2($chldout,$chldin,'pdf2txt.py', '-t', 'text', '-p', $p,$pdfname);
+        logit('info',"using $pdf2txt_exe");
+        $pid = open2($chldout,$chldin,$pdf2txt_exe, '-t', 'text', '-p', $p,$pdfname);
         $content = do { 
             local $/;
             <$chldout>;
@@ -165,9 +164,9 @@ foreach my $p (1 .. $pdf->numPages())   {
 
 
     my $len=length($content);
-    print("aftersystem call print: content pdfname: $pdfname len:$len\n");
+logit('debug',"after system call print: content pdfname: $pdfname len:$len");
 
-  logit('debug',"PAGE: $p $content") if ($debug >=2);
+logit('debug',"PAGE: $p $content");
   my $found = 0;
   if ($content =~ m/#_ (\w+) (.+?)_#/) {  # see if we have a parameter
                                 # page, if we do then search it for
@@ -177,11 +176,11 @@ foreach my $p (1 .. $pdf->numPages())   {
     my %variables;
     while ($content =~ s/#_ (\w+) (.+?) _#(.*)/$3/s) {
         $variables{$1} = $2;
-        print "Page: $p :$1 -> ###$2###" if ($debug >=2 );
+        logit('info',"Page: $p :$1 -> ###$2###");
         $found = 1;
     }
       $sectionLP = $p;
-      logit('debug',"range: $sectionFP - $sectionLP") if ($debug);
+      logit('debug',"range: $sectionFP - $sectionLP");
       $variables{'SectionFP'} = $sectionFP;
       $variables{'SectionLP'} = $sectionLP;
       push(@section, {%variables});
@@ -194,8 +193,8 @@ foreach my $p (1 .. $pdf->numPages())   {
 prDocDir ( $PDFDirectoryName );
 my $var;
 foreach $var (@section) { 
-    logit('debug',Dumper($var)) if ($debug >=3);
-    logit('debug',"startpage = ".$var->{'SectionFP'}." endpage = ".$var->{'SectionLP'}) if ($debug >=1);
+    logit('debug',Dumper($var));
+    logit('debug',"startpage = ".$var->{'SectionFP'}." endpage = ".$var->{'SectionLP'});
 
     my $attachmentname = $var->{'emailAttachmentName'}; 
     my $attachmentfilename = $$.$attachmentname; # append process id to ensure uniqueness of file names
@@ -211,53 +210,52 @@ foreach $var (@section) {
     my $printfile = 0; # false by default
     # test if body contains a from email address and use that if its there
     if ( $mycontent =~ s/<.?f.?r.?o.?m.?>(.*)<.?\/.?f.?r.?o.?m.?>//s ) {
-	logit('debug','Found from email address.') if ($debug>=2);
+	logit('debug','Found from email address.');
 	$from = "$1";
 	$from =~ s/\s+//g;
 	$reply_to = $from;
 	$bcc = $from if ($bccmyself); # bcc myself to from address
-	logit('debug',"from: $from") if ($debug>=2);
-	logit('debug',"bcc: $bcc") if ($debug>=2);
+	logit('debug',"from: $from");
+	logit('debug',"bcc: $bcc");
     } else {
 	print "\nin else statement debug=$debug\n";
-	logit('debug','Failed to find a from email address.') if ($debug>=2);
+	logit('debug','Failed to find a from email address.');
     }
     
     # test for <print> directive and print if found
     if ( $mycontent =~ s/<.?p.?r.?i.?n.?t.?>\n?//s ) {
 	$printfile=1; # found print command, we should print this file
     }
-    
+
     prFile($attachmentfilename);
     prDoc( { file  => $pdfname,  # name of long pdf to get pages from
 	     first => $var->{'SectionFP'},
 	     last  => $var->{'SectionLP'}-1});
     prEnd(); #file has now been save to disk
-       
+
     #log the results ";
-    logit('debug', "sendmail -> $sendmail") if ($debug>=2);
-    logit('debug', "reply_to -> $reply_to") if ($debug>=2);
-    logit('debug', "subject -> $subject") if ($debug>=2);
-    logit('debug', "content -> $mycontent") if ($debug>=3);
-    logit('debug', "to -> $to")  if ($debug>=2);
-    logit('debug', "attachmentname -> $attachmentname")  if ($debug>=2);
-    logit('debug', "attachmentfilename -> $attachmentfilename")  if ($debug>=2);
-    logit('debug', "Path: ".$PDFDirectoryName."$attachmentfilename") if ($debug>=2);
-    
-    my $filepath = $PDFDirectoryName.$attachmentfilename;
+    logit('debug', "sendmail -> $sendmail");
+    logit('debug', "reply_to -> $reply_to");
+    logit('debug', "subject -> $subject");
+    logit('debug', "content -> $mycontent");
+    logit('debug', "to -> $to") ;
+    logit('debug', "attachmentname -> $attachmentname") ;
+    logit('debug', "attachmentfilename -> $attachmentfilename") ;
+    logit('debug', "Path: ".$PDFDirectoryName."$attachmentfilename");
+
+    $filepath = $PDFDirectoryName.$attachmentfilename;
     if ( -r $filepath ) {
-	logit('debug', "File $filepath exists and is readable")  if ($debug>=2);
+	logit('debug', "File $filepath exists and is readable") ;
     } else {
-	logit('err', "File $filepath does not exist or is not readable")  if ($debug>=2);
-    }     
-    
-    
+	logit('err', "File $filepath does not exist or is not readable") ;
+    }    
+
     my $msg = MIME::Lite->new(
 	From    => "$from",
 	Subject => "$subject",
 	Type    => 'multipart/mixed',
 	);
-    
+
     if ($testemailaddress) {
 	logit('info',"Line: " . __LINE__. " Sending email to \$testemailaddress: $testemailaddress instead of $to");
 	$msg->add(To => "$testemailaddress");
@@ -265,7 +263,7 @@ foreach $var (@section) {
     } else {
 	logit('debug', __LINE__ . "Sending email to $to");
 	$msg->add(To => "$to");
-    }	
+    }
 
     if ($bccaddress) {
         logit('info',"overriding bcc address $bcc with config supplied bcc adress $bccaddress");
@@ -275,14 +273,14 @@ foreach $var (@section) {
     if ($bcc) {
 	logit('info', "adding Bcc: $bcc to email");
 	$msg->add(Bcc => "$bcc");
-    } 
-    
-    
+    }
+
+
     $msg->attach(
 	Type     => 'TEXT',
 	Data     => $mycontent,
 	);
-    
+
     $msg->attach(
 	Type     => 'application/pdf',
 	Path     => $filepath,
@@ -297,7 +295,7 @@ foreach $var (@section) {
 	#}
 	
     } else {
-	logit('debug', "\$sendemail not set: not sending email") if ($debug>=1);
+	logit('debug', "\$sendemail not set: not sending email");
     }
     
 
