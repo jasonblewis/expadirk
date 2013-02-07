@@ -1,7 +1,4 @@
 #!/usr/bin/perl -w
-# ;;; Local Variables: ***
-# ;;; compile-command: "expadirk ./testpdf.pdf" ***
-# ;;; End: ***
 
 # Expadirk v0.2 Copyright 2012 Jason Lewis
 
@@ -28,23 +25,6 @@
 # to test this program call from command line:  ./expadirk.pl testpdf.pdf
 
 use Config::Auto;
-my $config;
-$config = Config::Auto::parse();
-my $logfile = $config->{logfile};
-
-# redirect stdout and stderr to our log file because cups-pdf doesn't seem to save output
-open my $oldout, ">&STDOUT"     or die "Can't dup STDOUT: $!";
-open my $olderr, ">&", \*STDERR or die "Can't dup STDERR: $!";
-
-open STDOUT, '>>', $logfile or die "Can't redirect STDOUT: $!";
-open STDERR, ">&STDOUT"     or die "Can't dup STDOUT: $!";
-
-
-select STDERR; $| = 1;      # make unbuffered
-select STDOUT; $| = 1;      # make unbuffered
-print STDOUT "stdout redirected to log file\n" if ($debug <= 2); # this works for
-print STDERR "stderr redirected to log file\n" if ($debug <= 2);  # subprocesses too
-
 use warnings;
 use strict;
 use CAM::PDF;
@@ -57,6 +37,30 @@ use Net::CUPS::Destination;
 use IPC::Open2;
 use File::Which;
 
+my $config;
+$config = Config::Auto::parse();
+my $logfile = $config->{logfile};
+my $debug = $config->{debug};
+
+# redirect stdout and stderr to our log file because cups-pdf doesn't seem to save output
+# open my $oldout, ">&STDOUT"     or die "Can't dup STDOUT: $!";
+# open my $olderr, ">&", \*STDERR or die "Can't dup STDERR: $!";
+
+# if ($config->{OverwriteLogFile}) {
+#   open STDOUT, '>', $logfile or die "Can't redirect STDOUT: $!"; # overwrite log file
+# } else {
+#   open STDOUT, '>>', $logfile or die "Can't redirect STDOUT: $!"; # append
+#                                                                   # to
+#                                                                   # log file
+# }
+# open STDERR, ">&STDOUT"     or die "Can't dup STDOUT: $!";
+
+
+select STDERR; $| = 1;      # make unbuffered
+select STDOUT; $| = 1;      # make unbuffered
+print STDOUT "stdout redirected to log file\n" if ($debug <= 2); # this works for
+print STDERR "stderr redirected to log file\n" if ($debug <= 2);  # subprocesses too
+
 # level verbose explanation
 #     0 emerg system is unusable
 #     1 alert action must be taken immediately
@@ -68,7 +72,6 @@ use File::Which;
 #     7 debug messages generated to debug the application
 
 
-my $debug = $config->{debug};
 my $sendemail = $config->{sendmail};;
 my $testemailaddress = $config->{testemailaddress};
 my $bcc = $config->{bcc};
@@ -320,7 +323,11 @@ foreach $var (@section) {
 } # end for each
 
 # reset strout and stderr before exiting
-open STDOUT, ">&", $oldout or die "Can't dup \$oldout: $!";
-open STDERR, ">&", $olderr or die "Can't dup OLDERR: $!";
+# open STDOUT, ">&", $oldout or die "Can't dup \$oldout: $!";
+# open STDERR, ">&", $olderr or die "Can't dup OLDERR: $!";
 
 logit('info','expadirk ended');
+
+# Local Variables:
+# compile-command: "./expadirk ./testpdf-local.pdf"
+# End:
