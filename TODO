@@ -7,5 +7,7 @@
  - Warn the user if they try and launch expadirk and no config file
    can be found
  - use IPC::Run instead of IPC::Open2
+ - use POSIX should qualify which functions it uses
+
 
 

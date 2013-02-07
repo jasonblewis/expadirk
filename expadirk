@@ -1,6 +1,6 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 
-# Expadirk v0.2 Copyright 2012 Jason Lewis
+# Expadirk v0.3 Copyright 2012 Jason Lewis
 
 # This file is part of Expadirk.
 
@@ -24,12 +24,13 @@
 
 # to test this program call from command line:  ./expadirk.pl testpdf.pdf
 
-use Config::Auto;
 use warnings;
 use strict;
+use Config::Auto;
 use CAM::PDF;
 use Data::Dumper;
 use PDF::Reuse;
+use PDF::API2;
 use MIME::Lite;
 use POSIX;
 use Log::Dispatch::File;
@@ -230,11 +231,35 @@ foreach $var (@section) {
 	$printfile=1; # found print command, we should print this file
     }
 
-    prFile($attachmentfilename);
-    prDoc( { file  => $pdfname,  # name of long pdf to get pages from
-	     first => $var->{'SectionFP'},
-	     last  => $var->{'SectionLP'}-1});
-    prEnd(); #file has now been save to disk
+    # prFile($attachmentfilename);
+    # prDoc( { file  => $pdfname,  # name of long pdf to get pages from
+    #          first => $var->{'SectionFP'},
+    #          last  => $var->{'SectionLP'}-1});
+    # prEnd(); #file has now been save to disk
+
+    my $input = PDF::API2->open( $pdfname);
+    my $output = 'testapi2.pdf';
+    my $pdfout = PDF::API2->new( -file => $output );
+    my $root = $pdfout->outlines;
+    my $outline = $root->outline;
+       $outline->title('test-title');
+    my $import_page = 0;
+
+    my $document_page = 0;
+    foreach ($var->{'SectionFP'}.. $var->{'SectionLP'}-1 ) {
+
+      ++$import_page;
+      ++$document_page;
+
+      my $page = $pdfout->importpage($input, $_, $import_page);
+      my $bookmark = $outline->outline;
+      #$bookmark->title("Page $document_page");
+      #$bookmark->dest($page);
+      $outline->dest($page) if $document_page == 1;
+    }
+    $pdfout->preferences( -outlines => 1 );
+    $pdfout->update;
+    $pdfout->end;
 
     #log the results ";
     logit('debug', "sendmail -> $sendmail");
