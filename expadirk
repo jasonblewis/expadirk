@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 # ;;; Local Variables: ***
 # ;;; compile-command: "expadirk ./testpdf.pdf" ***
 # ;;; End: ***
@@ -27,9 +27,24 @@
 
 # to test this program call from command line:  ./expadirk.pl testpdf.pdf
 
+use warnings;
+use strict;
+use CAM::PDF;
+use Data::Dumper;
+use PDF::Reuse;
+use MIME::Lite;
+use POSIX;
+use Log::Dispatch::File;
+use Net::CUPS::Destination;
+use IPC::Open2;
+use File::Which;
+
 use Config::Auto;
+
 my $config;
 $config = Config::Auto::parse();
+
+my $debug = $config->{debug};
 my $logfile = $config->{logfile};
 
 # redirect stdout and stderr to our log file because cups-pdf doesn't seem to save output
@@ -45,17 +60,6 @@ select STDOUT; $| = 1;      # make unbuffered
 print STDOUT "stdout redirected to log file\n" if ($debug <= 2); # this works for
 print STDERR "stderr redirected to log file\n" if ($debug <= 2);  # subprocesses too
 
-use warnings;
-use strict;
-use CAM::PDF;
-use Data::Dumper;
-use PDF::Reuse;
-use MIME::Lite;
-use POSIX;
-use Log::Dispatch::File;
-use Net::CUPS::Destination;
-use IPC::Open2;
-use File::Which;
 
 # level verbose explanation
 #     0 emerg system is unusable
@@ -68,7 +72,6 @@ use File::Which;
 #     7 debug messages generated to debug the application
 
 
-my $debug = $config->{debug};
 my $sendemail = $config->{sendmail};;
 my $testemailaddress = $config->{testemailaddress};
 my $bcc = $config->{bcc};
