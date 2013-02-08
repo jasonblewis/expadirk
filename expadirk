@@ -44,7 +44,6 @@ $config = Config::Auto::parse();
 
 my $debug = $config->{debug};
 my $logfile = $config->{logfile};
-my $debug = $config->{debug};
 
 # redirect stdout and stderr to our log file because cups-pdf doesn't seem to save output
 open my $oldout, ">&STDOUT"     or die "Can't dup STDOUT: $!";
@@ -360,5 +359,5 @@ open STDERR, ">&", $olderr or die "Can't dup OLDERR: $!";
 logit('info','expadirk ended');
 
 # Local Variables:
-# compile-command: "./expadirk ./testpdf-local.pdf"
+# compile-command: "perl -w ./expadirk ./testpdf-local.pdf"
 # End:
