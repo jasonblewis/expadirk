@@ -49,14 +49,14 @@ my $logfile = $config->{logfile};
 open my $oldout, ">&STDOUT"     or die "Can't dup STDOUT: $!";
 open my $olderr, ">&", \*STDERR or die "Can't dup STDERR: $!";
 
-# if ($config->{OverwriteLogFile}) {
-#   open STDOUT, '>', $logfile or die "Can't redirect STDOUT: $!"; # overwrite log file
-# } else {
-#   open STDOUT, '>>', $logfile or die "Can't redirect STDOUT: $!"; # append
-#                                                                   # to
-#                                                                   # log file
-# }
-# open STDERR, ">&STDOUT"     or die "Can't dup STDOUT: $!";
+if ($config->{OverwriteLogFile}) {
+  open STDOUT, '>', $logfile or die "Can't redirect STDOUT: $!"; # overwrite log file
+} else {
+  open STDOUT, '>>', $logfile or die "Can't redirect STDOUT: $!"; # append
+                                                                  # to
+                                                                  # log file
+}
+open STDERR, ">&STDOUT"     or die "Can't dup STDOUT: $!";
 
 
 select STDERR; $| = 1;      # make unbuffered
@@ -131,6 +131,7 @@ my $defaultfromaddress = $config->{defaultfromaddress};
 my $printername = $config->{printername};
 my $printermedia = $config->{printermedia};
 my $printenable = $config->{printenable};
+logit('debug',"printenable: $printenable");
 my $bccmyself = $config->{bccmyself};
 my $usepdfminer = $config->{usepdfminer};
 
@@ -342,6 +343,7 @@ foreach $var (@section) {
 	$printer->addOption('Media',$printermedia);
 	if ($printenable) {
             my $jobid = $printer->printFile( $pdfoutfilepath, $attachmentfilename );
+            logit('debug',"printing $jobid $pdfoutfilepath $attachmentfilename");
         }
     }
 
