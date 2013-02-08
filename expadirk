@@ -359,5 +359,5 @@ open STDERR, ">&", $olderr or die "Can't dup OLDERR: $!";
 logit('info','expadirk ended');
 
 # Local Variables:
-# compile-command: "perl -w ./expadirk ./testpdf-local.pdf"
+# compile-command: "perl -w ./expadirk ./testpdf.pdf"
 # End:
