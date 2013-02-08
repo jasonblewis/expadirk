@@ -343,7 +343,7 @@ foreach $var (@section) {
         }
     }
 
-    #no need for the temp file any more - delete it
+    # no need for the temp file any more - delete it
     logit('debug', "deleting $pdfoutfilepath");
     if (unlink($pdfoutfilepath) != 1) {
 	logit('warn', "unable to delete $pdfoutfilepath or $pdfoutfilepath not found");
