@@ -30,7 +30,6 @@ use autodie qw(:all);
 use Config::Auto;
 use CAM::PDF;
 use Data::Dumper;
-use PDF::Reuse;
 use PDF::API2;
 use MIME::Lite;
 use POSIX;
@@ -196,7 +195,6 @@ foreach my $p (1 .. $pdf->numPages())   {
 
 
 # now make the pdf's and email them:
-prDocDir ( $PDFDirectoryName );
 my $var;
 foreach $var (@section) { 
     logit('debug',Dumper($var));
