@@ -234,22 +234,14 @@ foreach $var (@section) {
 	$printfile=1; # found print command, we should print this file
     }
 
-    # prFile($attachmentfilename);
-    # prDoc( { file  => $pdfname,  # name of long pdf to get pages from
-    #          first => $var->{'SectionFP'},
-    #          last  => $var->{'SectionLP'}-1});
-    # prEnd(); #file has now been save to disk
-
     my $pdfoutfilepath = File::Spec->catfile($PDFDirectoryName, $attachmentfilename);
 
-    logit('debug', "Path: ".$PDFDirectoryName."$attachmentfilename");
-
-
+    logit('debug', "Path: " . $pdfoutfilepath);
 
     my $input = PDF::API2->open( $pdfname);
     logit('debug',"reading pdf: $pdfname");
-    my $pdfout = PDF::API2->new( -file => $attachmentfilename );
-    logit('debug',"creating pdf: $attachmentfilename");
+    my $pdfout = PDF::API2->new( -file => $pdfoutfilepath );
+    logit('debug',"creating pdf: $attachmentfilename pdfout object: $pdfout");
     my $root = $pdfout->outlines;
     my $outline = $root->outline;
        $outline->title('test-title');
