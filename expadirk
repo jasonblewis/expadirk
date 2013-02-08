@@ -41,12 +41,14 @@ use File::Spec;
 
 my $config;
 $config = Config::Auto::parse();
+
+my $debug = $config->{debug};
 my $logfile = $config->{logfile};
 my $debug = $config->{debug};
 
 # redirect stdout and stderr to our log file because cups-pdf doesn't seem to save output
-# open my $oldout, ">&STDOUT"     or die "Can't dup STDOUT: $!";
-# open my $olderr, ">&", \*STDERR or die "Can't dup STDERR: $!";
+open my $oldout, ">&STDOUT"     or die "Can't dup STDOUT: $!";
+open my $olderr, ">&", \*STDERR or die "Can't dup STDERR: $!";
 
 # if ($config->{OverwriteLogFile}) {
 #   open STDOUT, '>', $logfile or die "Can't redirect STDOUT: $!"; # overwrite log file
@@ -62,6 +64,7 @@ select STDERR; $| = 1;      # make unbuffered
 select STDOUT; $| = 1;      # make unbuffered
 print STDOUT "stdout redirected to log file\n" if ($debug <= 2); # this works for
 print STDERR "stderr redirected to log file\n" if ($debug <= 2);  # subprocesses too
+
 
 # level verbose explanation
 #     0 emerg system is unusable
@@ -351,8 +354,8 @@ foreach $var (@section) {
 } # end for each
 
 # reset strout and stderr before exiting
-# open STDOUT, ">&", $oldout or die "Can't dup \$oldout: $!";
-# open STDERR, ">&", $olderr or die "Can't dup OLDERR: $!";
+open STDOUT, ">&", $oldout or die "Can't dup \$oldout: $!";
+open STDERR, ">&", $olderr or die "Can't dup OLDERR: $!";
 
 logit('info','expadirk ended');
 
