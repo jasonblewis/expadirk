@@ -26,6 +26,7 @@
 
 use warnings;
 use strict;
+use autodie qw(:all);
 use Config::Auto;
 use CAM::PDF;
 use Data::Dumper;
@@ -37,6 +38,7 @@ use Log::Dispatch::File;
 use Net::CUPS::Destination;
 use IPC::Open2;
 use File::Which;
+use File::Spec;
 
 my $config;
 $config = Config::Auto::parse();
@@ -237,9 +239,16 @@ foreach $var (@section) {
     #          last  => $var->{'SectionLP'}-1});
     # prEnd(); #file has now been save to disk
 
+    my $pdfoutfilepath = File::Spec->catfile($PDFDirectoryName, $attachmentfilename);
+
+    logit('debug', "Path: ".$PDFDirectoryName."$attachmentfilename");
+
+
+
     my $input = PDF::API2->open( $pdfname);
-    my $output = 'testapi2.pdf';
-    my $pdfout = PDF::API2->new( -file => $output );
+    logit('debug',"reading pdf: $pdfname");
+    my $pdfout = PDF::API2->new( -file => $attachmentfilename );
+    logit('debug',"creating pdf: $attachmentfilename");
     my $root = $pdfout->outlines;
     my $outline = $root->outline;
        $outline->title('test-title');
@@ -269,13 +278,10 @@ foreach $var (@section) {
     logit('debug', "to -> $to") ;
     logit('debug', "attachmentname -> $attachmentname") ;
     logit('debug', "attachmentfilename -> $attachmentfilename") ;
-    logit('debug', "Path: ".$PDFDirectoryName."$attachmentfilename");
-
-    my $filepath = $PDFDirectoryName.$attachmentfilename;
-    if ( -r $filepath ) {
-	logit('debug', "File $filepath exists and is readable") ;
+    if ( -r $pdfoutfilepath ) {
+	logit('debug', "File $pdfoutfilepath exists and is readable") ;
     } else {
-	logit('err', "File $filepath does not exist or is not readable") ;
+	logit('err', "File $pdfoutfilepath does not exist or is not readable") ;
     }    
 
     my $msg = MIME::Lite->new(
@@ -311,39 +317,38 @@ foreach $var (@section) {
 
     $msg->attach(
 	Type     => 'application/pdf',
-	Path     => $filepath,
+	Path     => $pdfoutfilepath,
 	Filename => "$attachmentfilename",
 	);
-    
+
     logit('info', "sending $attachmentname to: $to");
     if ($sendemail) {
 	logit('info', "\$sendemail set: really sending $attachmentfilename as $attachmentfilename to: $to");
 	$msg->send || logit('critical',"Critical Error: Was unable to send email:\nTo: $to\nSubject: $subject\nAttachment: $attachmentfilename");
 	#if ($msg->last_send_successful()) {
 	#}
-	
+
     } else {
 	logit('debug', "\$sendemail not set: not sending email");
     }
-    
 
     # print the file if $printfile is set
     if ($printfile) {
-	logit('debug',"printing the file: $filepath");
+	logit('debug',"printing the file: $pdfoutfilepath");
 	my $cups = Net::CUPS->new();
 	my $printer = $cups->getDestination( $printername );
 	my $name = $printer->getName();
 	my @options = $printer->getOptions();
 	$printer->addOption('Media',$printermedia);
 	if ($printenable) {
-            my $jobid = $printer->printFile( $filepath, $attachmentfilename );
+            my $jobid = $printer->printFile( $pdfoutfilepath, $attachmentfilename );
         }
     }
 
     #no need for the temp file any more - delete it
-    logit('debug', "deleting $filepath");
-    if (unlink($filepath) != 1) {
-	logit('warn', "unable to delete $filepath or $filepath not found");
+    logit('debug', "deleting $pdfoutfilepath");
+    if (unlink($pdfoutfilepath) != 1) {
+	logit('warn', "unable to delete $pdfoutfilepath or $pdfoutfilepath not found");
     }
 } # end for each
 
