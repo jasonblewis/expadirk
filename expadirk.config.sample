@@ -41,3 +41,6 @@ usepdfminer = 1
 
 # Set if you want the log files to overwrite each time expadirk runs. Otherwise logs are appended
 OverwriteLogFile = 0
+
+# Redirect STDERR and STDOUT output to log file:
+RedirectOutput = 1

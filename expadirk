@@ -38,6 +38,7 @@ use Net::CUPS::Destination;
 use IPC::Open2;
 use File::Which;
 use File::Spec;
+use Try::Tiny;
 
 my $config;
 $config = Config::Auto::parse();
@@ -49,6 +50,8 @@ my $logfile = $config->{logfile};
 open my $oldout, ">&STDOUT"     or die "Can't dup STDOUT: $!";
 open my $olderr, ">&", \*STDERR or die "Can't dup STDERR: $!";
 
+
+
 if ($config->{OverwriteLogFile}) {
   open STDOUT, '>', $logfile or die "Can't redirect STDOUT: $!"; # overwrite log file
 } else {
@@ -56,14 +59,34 @@ if ($config->{OverwriteLogFile}) {
                                                                   # to
                                                                   # log file
 }
-open STDERR, ">&STDOUT"     or die "Can't dup STDOUT: $!";
+
+my $dispatcher = Log::Dispatch->new;
+$dispatcher->add( Log::Dispatch::File->new( 
+		      name => 'somename',
+		      min_level => $debug,
+		      filename => $logfile,
+                      mode      => 'append') );
+# wrapper arround dispatcher to log to a file
+sub logit {
+    (my $level, my $message) = @_;
+    $dispatcher->log(level=> $level, message => $$.' '.strftime('%Y-%m-%d %H:%M:%S', localtime())." ".$message."\n");
+};
+
+logit('info','expadirk started-------------------------------------------------------------------------------------------------');
 
 
-select STDERR; $| = 1;      # make unbuffered
-select STDOUT; $| = 1;      # make unbuffered
-print STDOUT "stdout redirected to log file\n" if ($debug <= 2); # this works for
-print STDERR "stderr redirected to log file\n" if ($debug <= 2);  # subprocesses too
 
+if ($config->{RedirectOutput}) { #redirecting stdout and stderr to log file
+  open STDERR, ">&STDOUT"     or die "Can't dup STDOUT: $!";
+
+
+  select STDERR; $| = 1;      # make unbuffered
+  select STDOUT; $| = 1;      # make unbuffered
+  print STDOUT "stdout redirected to log file\n" if ($debug <= 2); # this works for
+  print STDERR "stderr redirected to log file\n" if ($debug <= 2);  # subprocesses too
+} else {
+  logit('debug',"RedirectOutput: " . $config->{RedirectOutput});
+}
 
 # level verbose explanation
 #     0 emerg system is unusable
@@ -80,19 +103,6 @@ my $sendemail = $config->{sendmail};;
 my $testemailaddress = $config->{testemailaddress};
 my $bcc = $config->{bcc};
 my $bccaddress = $config->{bccaddress};
-my $dispatcher = Log::Dispatch->new;
-$dispatcher->add( Log::Dispatch::File->new( 
-		      name => 'somename',
-		      min_level => $debug,
-		      filename => $logfile,
-                      mode      => 'append') );
-# wrapper arround dispatcher to log to a file
-sub logit {
-    (my $level, my $message) = @_;
-    $dispatcher->log(level=> $level, message => $$.' '.strftime('%Y-%m-%d %H:%M:%S', localtime())." ".$message."\n");
-};
-
-logit('info','expadirk started-------------------------------------------------------------------------------------------------');
 my $localarg;
 my $pdfname;
 
@@ -105,7 +115,7 @@ if (@ARGV) {
     
 } else {
     logit('info',"ERROR: no name for pdf file, bye.");
-    exit;
+    die "ERROR: no name for pdf file, bye.";
 }
 # check to see if file exists and is readable
 if ( -r $pdfname ) {
@@ -134,6 +144,7 @@ my $printenable = $config->{printenable};
 logit('debug',"printenable: $printenable");
 my $bccmyself = $config->{bccmyself};
 my $usepdfminer = $config->{usepdfminer};
+logit('debug',"usepdfminer: $usepdfminer");
 
 # if we are using pdfminer, test if its available
 if ($usepdfminer) {
@@ -228,7 +239,7 @@ foreach $var (@section) {
 	print "\nin else statement debug=$debug\n";
 	logit('debug','Failed to find a from email address.');
     }
-    
+
     # test for <print> directive and print if found
     if ( $mycontent =~ s/<.?p.?r.?i.?n.?t.?>\n?//s ) {
 	$printfile=1; # found print command, we should print this file
@@ -237,8 +248,14 @@ foreach $var (@section) {
     my $pdfoutfilepath = File::Spec->catfile($PDFDirectoryName, $attachmentfilename);
 
     logit('debug', "Path: " . $pdfoutfilepath);
-
-    my $input = PDF::API2->open( $pdfname);
+    my $input;
+    try { # try and open the PDF, if it fails warn the user it could
+          # be because of the PDF version.
+      $input = PDF::API2->open( $pdfname);
+      } catch {
+        logit('emerg',"Error: failed to open $pdfname. Error: $_");
+        die "Error: failed to open $pdfname. Error: $_" . " Aborting. Try using PDFs of version <= 1.4";
+      };
     logit('debug',"reading pdf: $pdfname");
     my $pdfout = PDF::API2->new( -file => $pdfoutfilepath );
     logit('debug',"creating pdf: $attachmentfilename pdfout object: $pdfout");
@@ -293,8 +310,12 @@ foreach $var (@section) {
     }
 
     if ($bccaddress) {
+      if ($bcc) { # bcc address supplied from PDF - overriding it
         logit('info',"overriding bcc address $bcc with config supplied bcc adress $bccaddress");
-        $bcc = $bccaddress;
+      } else {
+        logit('info',"setting config supplied bcc address to $bccaddress");
+      }
+      $bcc = $bccaddress;
     }
 
     if ($bcc) {
@@ -346,11 +367,14 @@ foreach $var (@section) {
     }
 } # end for each
 
-# reset strout and stderr before exiting
+
+if ($config->{RedirectOutput} ) { # reset strout and stderr before exiting
+
 open STDOUT, ">&", $oldout or die "Can't dup \$oldout: $!";
 open STDERR, ">&", $olderr or die "Can't dup OLDERR: $!";
 
 logit('info','expadirk ended');
+}
 
 # Local Variables:
 # compile-command: "perl -w ./expadirk ./testpdf.pdf"
