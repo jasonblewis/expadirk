@@ -8,6 +8,8 @@
    can be found
  - use IPC::Run instead of IPC::Open2
  - use POSIX should qualify which functions it uses
+ - if we fail to open the provided PDF, we should have a way of
+   emailing the user so they know there is a problem
 
 
-
+  
