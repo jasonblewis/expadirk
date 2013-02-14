@@ -239,7 +239,7 @@ foreach $var (@section) {
     my $subject = $var->{'emailSubject'};
     my $mycontent = $var->{'emailBody'};
     my $to = $var->{'email'};
-    my $from = 'ar@defaultemailaddress';
+    my $from = 'ar@defaultemailaddress.com.au';
     my $printfile = 0; # false by default
     # test if body contains a from email address and use that if its there
     if ( $mycontent =~ s/<.?f.?r.?o.?m.?>(.*)<.?\/.?f.?r.?o.?m.?>//s ) {
@@ -251,8 +251,8 @@ foreach $var (@section) {
 	logit('debug',"from: $from");
 	logit('debug',"bcc: $bcc");
     } else {
-	print "\nin else statement debug=$debug\n";
-	logit('debug','Failed to find a from email address.');
+	logit('debug',"Failed to find a from email address in email body. Using defaultfromaddress: $defaultfromaddress.");
+        $from = $defaultfromaddress;
     }
 
     # test for <print> directive and print if found
