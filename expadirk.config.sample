@@ -39,6 +39,9 @@ bccaddress = jason@mytestemailaddress.com
 #    pdfminer is significantly better at exctracting clean text than CAM::PDF
 usepdfminer = 1
 
+# path to pdf2txt from pdfminer
+pdf2txtPath = /usr/local/bin/pdf2txt.py
+
 # Set if you want the log files to overwrite each time expadirk runs. Otherwise logs are appended
 OverwriteLogFile = 0
 

@@ -40,8 +40,12 @@ use File::Which;
 use File::Spec;
 use Try::Tiny;
 
+use Carp::Always;
+
 my $config;
 $config = Config::Auto::parse();
+
+#print "config file is:" . $config->file . "\n";
 
 my $debug = $config->{debug};
 my $logfile = $config->{logfile};
@@ -71,6 +75,8 @@ sub logit {
     (my $level, my $message) = @_;
     $dispatcher->log(level=> $level, message => $$.' '.strftime('%Y-%m-%d %H:%M:%S', localtime())." ".$message."\n");
 };
+
+use Data::Dumper;  logit('debug', Dumper(\%ENV, \%INC) );
 
 logit('info','expadirk started-------------------------------------------------------------------------------------------------');
 
@@ -134,7 +140,12 @@ my $pdf = CAM::PDF->new($pdfname) || do {
 my $sectionFP = 1;
 my $sectionLP;
 my $content;
-my $pdf2txt = 'pdf2txt.py';
+my $pdf2txt;
+if ($config->{pdf2txtPath}) {
+  $pdf2txt = $config->{pdf2txtPath}; 
+} else {
+  $pdf2txt = 'pdf2txt.py';
+}
 my $pdf2txt_exe;
 my $PDFDirectoryName = $config->{PDFDirectoryName};
 my $defaultfromaddress = $config->{defaultfromaddress};
@@ -148,10 +159,14 @@ logit('debug',"usepdfminer: $usepdfminer");
 
 # if we are using pdfminer, test if its available
 if ($usepdfminer) {
+  if ( -X $pdf2txt) { # we seem to have a valid path for pdf2txt
+    $pdf2txt_exe = $pdf2txt;
+  } else {
     $pdf2txt_exe = which($pdf2txt);
-        unless ( -X $pdf2txt_exe ) {
-            die "$pdf2txt not found or not executeable";
-        }
+    unless ( -X $pdf2txt_exe ) {
+      die "$pdf2txt not found or not executeable";
+    }
+  }
 }
 
 
@@ -177,7 +192,7 @@ foreach my $p (1 .. $pdf->numPages())   {
             <$chldout>;
         }; 
     } else {
-        logit('info','using CAM::PDF');
+        logit('debug','using CAM::PDF');
         $content = $pdf->getPageText($p);
     }
 
