@@ -125,9 +125,9 @@ if (@ARGV) {
 }
 # check to see if file exists and is readable
 if ( -r $pdfname ) {
-    logit('debug', "File $pdfname exists and is readable");
+    logit('debug', "File pdfname: $pdfname exists and is readable");
 } else {
-    logit('error', "File $pdfname does not exist or is not readable");
+    logit('error', "File pdfname: $pdfname does not exist or is not readable");
 }     
 
 
@@ -272,6 +272,7 @@ foreach $var (@section) {
         die "Error: failed to open $pdfname. Error: $_" . " Aborting. Try using PDFs of version <= 1.4";
       };
     logit('debug',"reading pdf: $pdfname");
+    logit('debug',"current uid: " . getpwuid($>));
     my $pdfout = PDF::API2->new( -file => $pdfoutfilepath );
     logit('debug',"creating pdf: $attachmentfilename pdfout object: $pdfout");
     my $root = $pdfout->outlines;
@@ -304,9 +305,9 @@ foreach $var (@section) {
     logit('debug', "attachmentname -> $attachmentname") ;
     logit('debug', "attachmentfilename -> $attachmentfilename") ;
     if ( -r $pdfoutfilepath ) {
-	logit('debug', "File $pdfoutfilepath exists and is readable") ;
+	logit('debug', "File pdfoutfilepath: $pdfoutfilepath exists and is readable") ;
     } else {
-	logit('err', "File $pdfoutfilepath does not exist or is not readable") ;
+	logit('err', "File pdfoutfilepath: $pdfoutfilepath does not exist or is not readable") ;
     }    
 
     my $msg = MIME::Lite->new(
