@@ -226,7 +226,7 @@ foreach my $p (1 .. $pdf->numPages())   {
 # now make the pdf's and email them:
 my $var;
 foreach $var (@section) { 
-    logit('debug',Dumper($var));
+    logit('debug',"Dumper: " . Dumper($var));
     logit('debug',"startpage = ".$var->{'SectionFP'}." endpage = ".$var->{'SectionLP'});
 
     my $attachmentname = $var->{'emailAttachmentName'}; 
