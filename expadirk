@@ -76,7 +76,7 @@ sub logit {
     $dispatcher->log(level=> $level, message => $$.' '.strftime('%Y-%m-%d %H:%M:%S', localtime())." ".$message."\n");
 };
 
-use Data::Dumper;  logit('debug', Dumper(\%ENV, \%INC) );
+use Data::Dumper;  logit('debug', "Dumper: " . Dumper(\%ENV, \%INC) );
 
 logit('info','expadirk started-------------------------------------------------------------------------------------------------');
 
