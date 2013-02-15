@@ -42,8 +42,10 @@ use Try::Tiny;
 
 use Carp::Always;
 
-my $config;
-$config = Config::Auto::parse();
+my $ca     = Config::Auto->new(source => 'expadirk.config');
+
+my $config = $ca->parse;
+# $config = Config::Auto::parse();
 
 #print "config file is:" . $config->file . "\n";
 
@@ -77,7 +79,10 @@ sub logit {
 };
 
 
-logit('debug',"Config file:" . $config->file;
+logit('debug',"Config file:" . $ca->file);
+
+print "config file:" . $ca->file . "\n";
+print "config source:" . $ca->source . "\n";
 
 use Data::Dumper;  logit('debug', "Dumper: " . Dumper(\%ENV, \%INC) );
 
