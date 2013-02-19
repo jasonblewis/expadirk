@@ -1,5 +1,4 @@
 * Expadirk TODO
-
  - have a way, from command line, to redirect all emailing to a local email address for testing purposes.
  - ensure expadirk handles multiple email in the to:, cc:, and bcc:
    fields.
@@ -10,6 +9,13 @@
  - use POSIX should qualify which functions it uses
  - if we fail to open the provided PDF, we should have a way of
    emailing the user so they know there is a problem
+ - consider adding alternative ways of extracting text from the PDF
+   - pdfbox
+   java -cp /usr/share/java/pdfbox-1.7.0.jar:/usr/share/java/commons-logging-api-1.1.1.jar org.apache.pdfbox.PDFBox ExtractText  -console
+   - http://poppler.freedesktop.org/
+
+
+   
 
 
   
