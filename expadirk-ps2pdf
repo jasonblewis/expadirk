@@ -1,0 +1,47 @@
+#!/usr/bin/perl
+# this can be used to intercept the cups-pdf  call to ps2pdf and rewrite the command line parameters so you can call whatever you like.
+# it can also grab a copy of the ps file before its converted to pdf
+use warnings;
+use strict;
+
+use POSIX qw(strftime);
+
+use Log::Dispatch::File;
+
+use IPC::Open2;
+
+use File::Copy;
+use autodie qw(:all);
+
+my $logfile = "/var/log/expadirk-ps2pdf";
+
+my $dispatcher = Log::Dispatch->new;
+$dispatcher->add( Log::Dispatch::File->new(
+		      name => 'logfile',
+		      min_level => 'debug',
+		      filename => $logfile,
+                      mode      => 'append') );
+# wrapper arround dispatcher to log to a file
+sub logit {
+    (my $level, my $message) = @_;
+    $dispatcher->log(level=> $level, message => $$.' '.strftime('%Y-%m-%d %H:%M:%S', localtime())." ".$message."\n");
+};
+
+
+logit('debug',"in expadirk-ps2pdf");
+
+#logit('debug',$#ARGV+1 . " command line arguments");
+#foreach (@ARGV) { logit('debug',"$_"); }
+logit('debug', "args: " .join(", ", @ARGV));
+
+#arguments 1.4, -o, /var/lib/u_drive/PDF/job_2744-test-local.pdf, /var/spool/cups-pdf/SPOOL/cups2pdf-26621
+
+#snag a copy of the postscript file before gs gets a chance to mangle it
+copy($ARGV[3],"/home/jason/projects/expadirk/from.ps");
+
+
+logit('debug', "open2(\*CHLD_OUT, \*CHLD_IN, /usr/bin/ps2pdf, $ARGV[3], $ARGV[2]);");
+
+
+open2(\*CHLD_OUT, \*CHLD_IN, "/usr/bin/ps2pdf", $ARGV[3], $ARGV[2]);
+
