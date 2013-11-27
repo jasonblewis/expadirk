@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 # Expadirk v0.4 Copyright 2012 Jason Lewis
 
@@ -22,7 +22,7 @@
 # Scans through a provided PDF and searches for paramater pages. It then uses those paramaters
 # to compose an email to the recipient and email the relevant pages
 
-# to test this program call from command line:  ./expadirk.pl testpdf.pdf
+# to test this program call from command line:  ./expadirk testpdf.pdf
 
 use warnings;
 use strict;
@@ -34,13 +34,29 @@ use PDF::API2;
 use MIME::Lite;
 use POSIX;
 use Log::Dispatch::File;
+use Log::Dispatch::Screen;
+use Log::Log4perl qw(:easy);
 use Net::CUPS::Destination;
 use IPC::Open2;
 use File::Which;
 use File::Spec;
 use Try::Tiny;
-
+use v5.14;
+use Sys::Syslog;
+use Sys::Syslog qw(:standard :macros);
 use Carp::Always;
+
+Log::Log4perl->easy_init( { level   => $DEBUG, file    => ">/tmp/expadirk-log-ohyo4Ahh.log" } );
+DEBUG("test debug message from log::log4perl");
+
+open (MYFILE, '>/home/jason/projects/expadirk/expadirk-directwrite.txt');
+print MYFILE strftime('%Y-%m-%d %H:%M:%S', localtime()) .": hello from expadirk";
+close (MYFILE);
+
+#sleep 1000;
+# syslogging
+openlog("expadirk",'cons.pid','user');
+syslog('debug','hello from expadirk');
 
 my $ca     = Config::Auto->new(source => 'expadirk.config');
 
@@ -52,9 +68,15 @@ my $config = $ca->parse;
 my $debug = $config->{debug};
 my $logfile = $config->{logfile};
 
+
+
+my $oldout;
+my $olderr;
+
 # redirect stdout and stderr to our log file because cups-pdf doesn't seem to save output
-open my $oldout, ">&STDOUT"     or die "Can't dup STDOUT: $!";
-open my $olderr, ">&", \*STDERR or die "Can't dup STDERR: $!";
+# save the old stdout and stderr so they can be restored afterwards
+open $oldout, ">&STDOUT";
+open $olderr, ">&", \*STDERR;
 
 
 
@@ -67,11 +89,14 @@ if ($config->{OverwriteLogFile}) {
 }
 
 my $dispatcher = Log::Dispatch->new;
-$dispatcher->add( Log::Dispatch::File->new( 
+$dispatcher->add( Log::Dispatch::File->new(
 		      name => 'somename',
 		      min_level => $debug,
 		      filename => $logfile,
                       mode      => 'append') );
+
+
+
 # wrapper arround dispatcher to log to a file
 sub logit {
     (my $level, my $message) = @_;
@@ -91,7 +116,7 @@ logit('info','expadirk started--------------------------------------------------
 
 
 if ($config->{RedirectOutput}) { #redirecting stdout and stderr to log file
-  open STDERR, ">&STDOUT"     or die "Can't dup STDOUT: $!";
+  open STDERR, ">&STDOUT"  ;
 
 
   select STDERR; $| = 1;      # make unbuffered
@@ -100,6 +125,8 @@ if ($config->{RedirectOutput}) { #redirecting stdout and stderr to log file
   print STDERR "stderr redirected to log file\n" if ($debug <= 2);  # subprocesses too
 } else {
   logit('debug',"RedirectOutput: " . $config->{RedirectOutput});
+  $dispatcher->add( Log::Dispatch::Screen->new( name => 'screen',
+                                                min_level => $debug ));
 }
 
 # level verbose explanation
@@ -162,18 +189,53 @@ my $printermedia = $config->{printermedia};
 my $printenable = $config->{printenable};
 logit('debug',"printenable: $printenable");
 my $bccmyself = $config->{bccmyself};
-my $usepdfminer = $config->{usepdfminer};
-logit('debug',"usepdfminer: $usepdfminer");
+#my $usepdfminer = $config->{usepdfminer};
+#logit('debug',"usepdfminer: $usepdfminer");
+my $pdfextractiontool = $config->{"PDFExtractionTool"};
+logit('debug',"PDFExtractionTool: $pdfextractiontool");
 
-# if we are using pdfminer, test if its available
-if ($usepdfminer) {
-  if ( -X $pdf2txt) { # we seem to have a valid path for pdf2txt
-    $pdf2txt_exe = $pdf2txt;
-  } else {
-    $pdf2txt_exe = which($pdf2txt);
-    unless ( -X $pdf2txt_exe ) {
-      die "$pdf2txt not found or not executeable";
+my $javapath;
+my $java_exe;
+my $javaclasspath;
+my $javaclassname;
+my $pdfbox_command;
+my $pdfbox_options;
+
+given ($pdfextractiontool) {
+  when ("pdfapi2") {
+    logit('debug',"using PDF::API2 for text extraction");
+  }
+  when ("pdfminer") {
+    logit('debug',"using pdfminder for text extraction");
+    # if we are using pdfminer, test if its available
+    if ( -X $pdf2txt) { # we seem to have a valid path for pdf2txt
+      $pdf2txt_exe = $pdf2txt;
+    } else {
+      $pdf2txt_exe = which($pdf2txt);
+      unless ( -X $pdf2txt_exe ) {
+        die "$pdf2txt not found or not executeable";
+      }
     }
+  }
+  when ("pdfbox") {
+    logit('debug',"using pdfbox for text extraction");
+    $javapath = $config->{javapath};
+    logit('debug',"config path to java bin: $javapath");
+    ###  java -cp /usr/share/java/pdfbox-1.7.0.jar:/usr/share/java/commons-logging-api-1.1.1.jar org.apache.pdfbox.PDFBox ExtractText -console /var/lib/u_drive/PDF/job_2728-ARPR2STA_OT.pdf  -startPage -endPage
+    if ( -X $javapath) { # we seem to have a valid path for java2txt
+      logit('debug',"valid java path for");
+      $java_exe = $javapath;
+    } else {
+      $java_exe = which($javapath);
+      unless ( -X $java_exe ) {
+        logit('info',"$javapath not found or not executeable");
+        die "$javapath not found or not executeable";
+      }
+    };
+    $javaclasspath = $config->{javaclasspath};
+    $javaclassname = $config->{javaclassname};
+    $pdfbox_command = $config->{pdfbox_command};
+    $pdfbox_options = $config->{pdfbox_options};
   }
 }
 
@@ -187,21 +249,36 @@ my @section;
 
 my $chldout;
 my $chldin;
-my $pid; # = open2($chldout,$chldin,$pdf2txt_exe, '-t', 'text', '-p', '2',$pdfname);
+my $pid;
 
 
 foreach my $p (1 .. $pdf->numPages())   {
     logit('debug',"before system call page: $p\n");
-    if ($usepdfminer) {
+
+    given ($pdfextractiontool) {
+      when ("pdfminer") {
         logit('info',"using $pdf2txt_exe");
         $pid = open2($chldout,$chldin,$pdf2txt_exe, '-t', 'text', '-p', $p,$pdfname);
         $content = do { 
-            local $/;
-            <$chldout>;
-        }; 
-    } else {
-        logit('debug','using CAM::PDF');
+          local $/;
+          <$chldout>;
+        }
+      }
+      when ("campdf") {
+        logit('debug','using CAM::PDF to get page content');
         $content = $pdf->getPageText($p);
+      }
+      when ("pdfbox" ) {
+        logit('debug','using pdfbox to get page content');
+        my @parms = ($java_exe,'-cp',$javaclasspath,$javaclassname, $pdfbox_command, $pdfbox_options, '-startPage',$p,'-endPage',$p,$pdfname);
+        logit('debug',"call to open2: " . join ', ', map defined $_ ? qq/'$_'/ : '<undef>', @parms);
+        $pid = open2($chldout,$chldin,@parms);
+        $content = do {
+          local $/;
+          <$chldout>;
+        };
+        logit('debug',"content from pdfbox: $content");
+      }
     }
 
 
@@ -375,6 +452,11 @@ foreach $var (@section) {
 	logit('debug',"printing the file: $pdfoutfilepath");
 	my $cups = Net::CUPS->new();
 	my $printer = $cups->getDestination( $printername );
+
+        unless (defined $printer) {
+          logit('critical',"Critical Error: Unable to find $printername");
+          exit 1;
+        }
 	my $name = $printer->getName();
 	my @options = $printer->getOptions();
 	$printer->addOption('Media',$printermedia);
