@@ -11,7 +11,7 @@ logfile = /var/lib/u_drive/PDF/log.txt
 debug = 2
 
 # set sendmail to 1 to actually allow sending of emails
-sendmail = 1
+emailenable = 1
 
 # directory to store PDFs as they are parsed, split and emailed off
 PDFDirectoryName = /var/lib/u_drive/PDF/

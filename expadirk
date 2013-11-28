@@ -45,55 +45,39 @@ use v5.14;
 use Sys::Syslog;
 use Sys::Syslog qw(:standard :macros);
 use Carp::Always;
+use File::Temp qw/ tempfile tempdir /;
 
-Log::Log4perl->easy_init( { level   => $DEBUG, file    => ">/tmp/expadirk-log-ohyo4Ahh.log" } );
+
+my $l4pfh;
+my $l4pfilename;
+($l4pfh,$l4pfilename) = tempfile();
+
+Log::Log4perl->easy_init( { level   => $DEBUG, file    => $l4pfilename } );
+say "log4perl log file $l4pfilename";
+
 DEBUG("test debug message from log::log4perl");
 
-open (MYFILE, '>/home/jason/projects/expadirk/expadirk-directwrite.txt');
-print MYFILE strftime('%Y-%m-%d %H:%M:%S', localtime()) .": hello from expadirk";
-close (MYFILE);
-
-#sleep 1000;
-# syslogging
 openlog("expadirk",'cons.pid','user');
 syslog('debug','hello from expadirk');
 
 my $ca     = Config::Auto->new(source => 'expadirk.config');
 
 my $config = $ca->parse;
-# $config = Config::Auto::parse();
 
-#print "config file is:" . $config->file . "\n";
 
 my $debug = $config->{debug};
 my $logfile = $config->{logfile};
 
-
-
-my $oldout;
-my $olderr;
-
-# redirect stdout and stderr to our log file because cups-pdf doesn't seem to save output
-# save the old stdout and stderr so they can be restored afterwards
-open $oldout, ">&STDOUT";
-open $olderr, ">&", \*STDERR;
-
-
-
-if ($config->{OverwriteLogFile}) {
-  open STDOUT, '>', $logfile or die "Can't redirect STDOUT: $!"; # overwrite log file
-} else {
-  open STDOUT, '>>', $logfile or die "Can't redirect STDOUT: $!"; # append
-                                                                  # to
-                                                                  # log file
-}
+my $WorkingDirectoryRoot = $config->{WorkingDirectoryRoot};
+my $PDFDirectoryName = tempdir("expadirk.XXXX", DIR => $WorkingDirectoryRoot );
+say "PDFDirectoryName = $PDFDirectoryName";
 
 my $dispatcher = Log::Dispatch->new;
-$dispatcher->add( Log::Dispatch::File->new(
-		      name => 'somename',
-		      min_level => $debug,
-		      filename => $logfile,
-                      mode      => 'append') );
+$dispatcher->add( Log::Dispatch::File->new( name => 'somename',
+                                            min_level => $debug,
+                                            filename => $logfile . '.' . getpwuid($<),
+                                            mode      => 'append',
+                                            permissions => oct('0666') ));
 
 
 
@@ -106,28 +90,9 @@ sub logit {
 
 logit('debug',"Config file:" . $ca->file);
 
-print "config file:" . $ca->file . "\n";
-print "config source:" . $ca->source . "\n";
-
 use Data::Dumper;  logit('debug', "Dumper: " . Dumper(\%ENV, \%INC) );
 
 logit('info','expadirk started-------------------------------------------------------------------------------------------------');
-
-
-
-if ($config->{RedirectOutput}) { #redirecting stdout and stderr to log file
-  open STDERR, ">&STDOUT"  ;
-
-
-  select STDERR; $| = 1;      # make unbuffered
-  select STDOUT; $| = 1;      # make unbuffered
-  print STDOUT "stdout redirected to log file\n" if ($debug <= 2); # this works for
-  print STDERR "stderr redirected to log file\n" if ($debug <= 2);  # subprocesses too
-} else {
-  logit('debug',"RedirectOutput: " . $config->{RedirectOutput});
-  $dispatcher->add( Log::Dispatch::Screen->new( name => 'screen',
-                                                min_level => $debug ));
-}
 
 # level verbose explanation
 #     0 emerg system is unusable
@@ -140,21 +105,20 @@ if ($config->{RedirectOutput}) { #redirecting stdout and stderr to log file
 #     7 debug messages generated to debug the application
 
 
-my $sendemail = $config->{sendmail};;
+my $emailenable = $config->{emailenable};;
 my $testemailaddress = $config->{testemailaddress};
 my $bcc = $config->{bcc};
 my $bccaddress = $config->{bccaddress};
 my $localarg;
 my $pdfname;
+my $pdfname2;
 
 if (@ARGV) {
-    foreach my $argnum (0 .. $#ARGV) { 
-	print "Argument $argnum: $ARGV[$argnum]\n";
-    $pdfname = $ARGV[0];
+    foreach my $argnum (0 .. $#ARGV) {
+	logit('debug', "Argument $argnum: $ARGV[$argnum]");
     }
-#    logit('info',"Command Line argumets: ".$0."|$localarg");
-    
-} else {
+    $pdfname = $ARGV[0];
+  } else {
     logit('info',"ERROR: no name for pdf file, bye.");
     die "ERROR: no name for pdf file, bye.";
 }
@@ -163,7 +127,7 @@ if ( -r $pdfname ) {
     logit('debug', "File pdfname: $pdfname exists and is readable");
 } else {
     logit('error', "File pdfname: $pdfname does not exist or is not readable");
-}     
+}
 
 
 my $pdf = CAM::PDF->new($pdfname) || do {
@@ -182,7 +146,6 @@ if ($config->{pdf2txtPath}) {
   $pdf2txt = 'pdf2txt.py';
 }
 my $pdf2txt_exe;
-my $PDFDirectoryName = $config->{PDFDirectoryName};
 my $defaultfromaddress = $config->{defaultfromaddress};
 my $printername = $config->{printername};
 my $printermedia = $config->{printermedia};
@@ -319,7 +282,7 @@ foreach $var (@section) {
     # check to see if it ends in pdf and if not, add PDF to it
     if ($attachmentfilename !~ /\.pdf\z/i) {
 	$attachmentfilename = $attachmentfilename . ".PDF" }
-    my $sendmail = "/usr/sbin/sendmail -t"; 
+    my $sendmail = "/usr/sbin/sendmail -t";
     my $reply_to = 'From: ar@defaultemailaddress.com.au';
     my $subject = $var->{'emailSubject'};
     my $mycontent = $var->{'emailBody'};
@@ -382,7 +345,7 @@ foreach $var (@section) {
     $pdfout->end;
 
     #log the results ";
-    logit('debug', "sendmail -> $sendmail");
+    logit('debug', "emailenable -> $emailenable");
     logit('debug', "reply_to -> $reply_to");
     logit('debug', "subject -> $subject");
     logit('debug', "content -> $mycontent");
@@ -437,14 +400,14 @@ foreach $var (@section) {
 	);
 
     logit('info', "sending $attachmentname to: $to");
-    if ($sendemail) {
-	logit('info', "\$sendemail set: really sending $attachmentfilename as $attachmentfilename to: $to");
+    if ($emailenable) {
+	logit('info', "\$emailenable set: really sending $attachmentfilename as $attachmentfilename to: $to");
 	$msg->send || logit('critical',"Critical Error: Was unable to send email:\nTo: $to\nSubject: $subject\nAttachment: $attachmentfilename");
 	#if ($msg->last_send_successful()) {
 	#}
 
     } else {
-	logit('debug', "\$sendemail not set: not sending email");
+	logit('debug', "\$emailenable not set: not sending email");
     }
 
     # print the file if $printfile is set
@@ -472,15 +435,6 @@ foreach $var (@section) {
 	logit('warn', "unable to delete $pdfoutfilepath or $pdfoutfilepath not found");
     }
 } # end for each
-
-
-if ($config->{RedirectOutput} ) { # reset strout and stderr before exiting
-
-open STDOUT, ">&", $oldout or die "Can't dup \$oldout: $!";
-open STDERR, ">&", $olderr or die "Can't dup OLDERR: $!";
-
-logit('info','expadirk ended');
-}
 
 # Local Variables:
 # compile-command: "perl -w ./expadirk ./testpdf.pdf"
